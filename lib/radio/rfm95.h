@@ -2,51 +2,47 @@
 #define _RFM95_H
 
 #include <stdint.h>
-
-// Pin mappings on TTGO ESP32 LoRa OLED v1 module
-
-#define DIO0			GPIO_NUM_26
-#define DIO1			GPIO_NUM_33
-#define DIO2			GPIO_NUM_32
+#include <module.h>
 
 #define FXOSC			(32*MEGAHERTZ)
 
 #define FIFO_SIZE		64
 
-#define REG_FIFO		0x00
-#define REG_OP_MODE		0x01
-#define REG_BITRATE_MSB		0x02
-#define REG_BITRATE_LSB		0x03
-#define REG_FRF_MSB		0x06
-#define REG_FRF_MID		0x07
-#define REG_FRF_LSB		0x08
-#define REG_LNA			0x0C
-#define REG_RX_CONFIG		0x0D
-#define REG_RSSI_CONFIG		0x0E
-#define REG_RSSI		0x11
-#define REG_RX_BW		0x12
-#define REG_OOK_PEAK		0x14
-#define REG_OOK_FIX		0x15
-#define REG_OOK_AVG		0x16
-#define REG_FEI_MSB		0x1D
-#define REG_FEI_LSB		0x1E
-#define REG_PREAMBLE_DETECT	0x1F
-#define REG_PREAMBLE_MSB	0x25
-#define REG_PREAMBLE_LSB	0x26
-#define REG_SYNC_CONFIG		0x27
-#define REG_SYNC_VALUE_1	0x28
-#define REG_SYNC_VALUE_2	0x29
-#define REG_SYNC_VALUE_3	0x2A
-#define REG_SYNC_VALUE_4	0x2B
-#define REG_PACKET_CONFIG_1	0x30
-#define REG_PACKET_CONFIG_2	0x31
-#define REG_PAYLOAD_LENGTH	0x32
-#define REG_FIFO_THRESH		0x35
-#define REG_SEQ_CONFIG_1	0x36
-#define REG_IRQ_FLAGS_1		0x3E
-#define REG_IRQ_FLAGS_2		0x3F
-#define REG_DIO_MAPPING_1	0x40
-#define REG_VERSION		0x42
+#define REG_FIFO                0x00
+#define REG_OP_MODE             0x01
+#define REG_BITRATE_MSB         0x02
+#define REG_BITRATE_LSB         0x03
+#define REG_FRF_MSB             0x06
+#define REG_FRF_MID             0x07
+#define REG_FRF_LSB             0x08
+#define REG_PA_CONFIG           0x09
+#define REG_LNA                 0x0C
+#define REG_RX_CONFIG           0x0D
+#define REG_RSSI_CONFIG         0x0E
+#define REG_RSSI                0x11
+#define REG_RX_BW               0x12
+#define REG_OOK_PEAK            0x14
+#define REG_OOK_FIX             0x15
+#define REG_OOK_AVG             0x16
+#define REG_FEI_MSB             0x1D
+#define REG_FEI_LSB             0x1E
+#define REG_PREAMBLE_DETECT     0x1F
+#define REG_PREAMBLE_MSB        0x25
+#define REG_PREAMBLE_LSB        0x26
+#define REG_SYNC_CONFIG         0x27
+#define REG_SYNC_VALUE_1        0x28
+#define REG_SYNC_VALUE_2        0x29
+#define REG_SYNC_VALUE_3        0x2A
+#define REG_SYNC_VALUE_4        0x2B
+#define REG_PACKET_CONFIG_1     0x30
+#define REG_PACKET_CONFIG_2     0x31
+#define REG_PAYLOAD_LENGTH      0x32
+#define REG_FIFO_THRESH         0x35
+#define REG_SEQ_CONFIG_1        0x36
+#define REG_IRQ_FLAGS_1         0x3E
+#define REG_IRQ_FLAGS_2         0x3F
+#define REG_DIO_MAPPING_1       0x40
+#define REG_VERSION             0x42
 
 // REG_OP_MODE
 #define FSK_OOK_MODE		(0 << 7)
@@ -60,6 +56,9 @@
 #define MODE_TX			3
 #define MODE_FSRX		4
 #define MODE_RX			5
+
+// REG_PA_CONFIG
+#define PA_BOOST            (1 << 7)
 
 // REG_LNA
 #define LNA_GAIN_MAX		(1 << 5)

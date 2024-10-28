@@ -15,7 +15,7 @@ fi
 
 mkdir -p project
 cd project
-rm -fr CMakeLists.txt component.mk components dependencies include main Makefile partitions.csv sdkconfig
+rm -fr CMakeLists.txt component.mk components dependencies include src Makefile partitions.csv sdkconfig.defaults src
 if [ -d build ]; then
     # build directory will be owned by root if using docker
     if [ $(stat --format=%U build) = root ]; then
@@ -26,14 +26,15 @@ if [ -d build ]; then
 fi
 
 cp -a ../include .
-cp -a ../$src main
-mv main/sdkconfig .
+cp -a ../$src src
+mv src/sdkconfig sdkconfig.defaults
 
 sed "s/xyzzy/$project/" < ../mk/Makefile > Makefile
 sed "s/xyzzy/$project/" < ../mk/CMakeLists.project > CMakeLists.txt
 cp ../mk/partitions.csv .
-cp ../mk/CMakeLists.main main/CMakeLists.txt
-cp ../mk/component.mk main/component.mk
+cp ../mk/platformio.ini .
+cp ../mk/CMakeLists.main src/CMakeLists.txt
+cp ../mk/component.mk src/component.mk
 
 # Handle a special "network" pseudo-component to allow choosing
 # between Bluetooth tethering and WiFi (currently mutually exclusive).
@@ -55,8 +56,8 @@ make_dummy_btstack() {
 }
 
 mkdir components
-if [ -f main/dependencies ]; then
-    for dep in $(cat main/dependencies); do
+if [ -f src/dependencies ]; then
+    for dep in $(cat src/dependencies); do
 	if [ "$dep" = network ]; then
 	    # special case
 	    handle_network_component

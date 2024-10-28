@@ -93,9 +93,9 @@ void rfm95_init(void) {
 	spi_init();
 	rfm95_reset();
 
-	gpio_set_direction(DIO2, GPIO_MODE_INPUT);
-	gpio_set_intr_type(DIO2, GPIO_INTR_POSEDGE);
-	// Interrupt on DIO2 when SyncMatch occurs.
+	gpio_set_direction(LORA_DIO2, GPIO_MODE_INPUT);
+	gpio_set_intr_type(LORA_DIO2, GPIO_INTR_POSEDGE);
+	// Interrupt on LORA_DIO2 when SyncMatch occurs.
 	write_register(REG_DIO_MAPPING_1, 3 << DIO2_MAPPING_SHIFT);
 
 	// Must be in Sleep mode first before the second call can change to FSK/OOK mode.
@@ -129,6 +129,9 @@ void rfm95_init(void) {
 	write_register(REG_PACKET_CONFIG_1, PACKET_FORMAT_FIXED);
 	write_register(REG_PAYLOAD_LENGTH, 0);
 	write_register(REG_PACKET_CONFIG_2, PACKET_MODE | 0);
+
+	// use PA_BOOST output pin
+	write_register(REG_PA_CONFIG, PA_BOOST | 8);
 }
 
 static inline bool fifo_empty(void) {
@@ -247,7 +250,7 @@ typedef void wait_fn_t(int);
 
 static int rx_common(wait_fn_t wait_fn, uint8_t *buf, int count, int timeout) {
 	ESP_LOGD(TAG, "starting receive");
-	gpio_intr_enable(DIO2);
+	gpio_intr_enable(LORA_DIO2);
 	set_mode_receive();
 	if (!packet_seen()) {
 		// Stay in RX mode.
@@ -280,7 +283,7 @@ static int rx_common(wait_fn_t wait_fn, uint8_t *buf, int count, int timeout) {
 	}
 	set_mode_sleep();
 	clear_fifo();
-	gpio_intr_disable(DIO2);
+	gpio_intr_disable(LORA_DIO2);
 	if (n > 0) {
 		// Remove spurious final byte consisting of just one or two high bits.
 		uint8_t b = buf[n-1];
@@ -300,7 +303,7 @@ static void sleep_until_interrupt(int timeout) {
 	uint64_t us = (uint64_t)timeout * MILLISECOND;
 	esp_sleep_enable_timer_wakeup(us);
 	// Wake up on receive interrupt.
-	gpio_wakeup_enable(DIO2, GPIO_INTR_HIGH_LEVEL);
+	gpio_wakeup_enable(LORA_DIO2, GPIO_INTR_HIGH_LEVEL);
 	esp_sleep_enable_gpio_wakeup();
 	esp_light_sleep_start();
 }
@@ -337,7 +340,7 @@ static void install_isr(void) {
 		return;
 	}
 	gpio_install_isr_service(0);
-	gpio_isr_handler_add(DIO2, rx_interrupt, 0);
+	gpio_isr_handler_add(LORA_DIO2, rx_interrupt, 0);
 	isr_installed = 1;
 }
 
