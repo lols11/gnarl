@@ -6,131 +6,252 @@
 #include <esp_timer.h>
 #include <driver/gpio.h>
 #include <freertos/FreeRTOS.h>
-#include <freertos/queue.h>
 #include <freertos/task.h>
+#include <freertos/timers.h>
 
+#include "adc.h"
 #include "display.h"
 #include "module.h"
 #include "oled.h"
 
-typedef struct {
-	display_op_t op;
-	int arg;
-} display_command_t;
+#define DISPLAY_TIMEOUT 5 // seconds
+#define ROW_HEIGHT (OLED_HEIGHT / 4)
+#define CHAR_WIDTH 8
+#define CENTER_OFFSET(x, object_width) ((x - object_width) / 2)
+#define Y_LINE_CENTER(y, object_height) (y * ROW_HEIGHT + CENTER_OFFSET(ROW_HEIGHT, object_height))
 
-#define QUEUE_LENGTH	100
+typedef struct
+{
+	uint8_t width;
+	uint8_t height;
+	const uint8_t *bits;
+} glyph_t;
 
-static QueueHandle_t display_queue;
+static TaskHandle_t task_handle;
+static TimerHandle_t shutdown_timer;
 
-static int connected = false;
-static int phone_rssi;
-static int pump_rssi;
-static int command_time;  // seconds
+static const glyph_t PHONE = {
+	.height = 15,
+	.width = 9,
+	.bits = (uint8_t[]){0xfe, 0x00, 0x39, 0x01, 0x01, 0x01, 0x7d, 0x01, 0x45, 0x01, 0x45, 0x01, 0x45, 0x01, 0x45, 0x01, 0x45, 0x01, 0x45, 0x01, 0x7d, 0x01, 0x01, 0x01, 0x11, 0x01, 0x01, 0x01, 0xfe}};
 
-#define DISPLAY_TIMEOUT	5  // seconds
+static const glyph_t BATTERY = {
+	.height = 9,
+	.width = 15,
+	.bits = (uint8_t[]){0xfc, 0x7f, 0x04, 0x7f, 0x07, 0x7f, 0x01, 0x7f, 0x01, 0x7f, 0x01, 0x7e, 0x07, 0x7e, 0x04, 0x7e, 0xfc, 0x7f}};
 
-static void format_time_ago(char *buf) {
-	int now = esp_timer_get_time() / 1000000;
-	int delta = now - command_time;
-	int min = delta / 60;
-	if (min == 0) {
-		sprintf(buf, "%ds", delta);
-		return;
+static const glyph_t PUMP = {
+	.height = 9,
+	.width = 15,
+	.bits = (uint8_t[]){0xf0, 0x7f, 0x10, 0x40, 0xd1, 0x57, 0x51, 0x44, 0x51, 0x44, 0xd1, 0x57, 0x1d, 0x40, 0x06, 0x40, 0xfc, 0x7f}};
+
+static const glyph_t CLOCK = {
+	.height = 15,
+	.width = 15,
+	.bits = (uint8_t[]){0xe0, 0x03, 0x98, 0x0c, 0x84, 0x10, 0x02, 0x20, 0x82, 0x20, 0x81, 0x40, 0x81, 0x40, 0x87, 0x70, 0x01, 0x41, 0x01, 0x42, 0x02, 0x20, 0x02, 0x20, 0x84, 0x10, 0x98, 0x0c, 0xe0, 0x03}};
+
+static void format_time_period(char *buf, uint32_t period)
+{
+	uint8_t seconds = period % 60;
+	period /= 60;
+	uint8_t minutes = period % 60;
+	period /= 60;
+	uint8_t hours = period % 24;
+	period /= 24;
+	uint8_t days = period;
+
+	if (days > 0)
+	{
+		sprintf(buf, "%2dd%2dh", days, hours);
 	}
-	if (min < 60) {
-		sprintf(buf, "%dm", min);
-		return;
+	else if (hours > 0)
+	{
+		sprintf(buf, "%2dh%2dm", hours, minutes);
 	}
-	int hr = min / 60;
-	min = min % 60;
-	sprintf(buf, "%dh%dm", hr, min);
-}
-
-static void update(display_command_t cmd) {
-	switch (cmd.op) {
-	case PHONE_RSSI:
-		phone_rssi = cmd.arg;
-		ESP_LOGD(TAG, "phone RSSI = %d", phone_rssi);
-		return;
-	case PUMP_RSSI:
-		pump_rssi = cmd.arg;
-		ESP_LOGD(TAG, "pump RSSI = %d", pump_rssi);
-		return;
-	case COMMAND_TIME:
-		command_time = cmd.arg;
-		ESP_LOGD(TAG, "command time = %d", command_time);
-		return;
-	case CONNECTED:
-		connected = cmd.arg;
-		break;
-	default:
-		break;
+	else if (minutes > 0)
+	{
+		sprintf(buf, "%2dm%2ds", minutes, seconds);
 	}
-	oled_on();
-	oled_clear();
-
-	oled_font_medium();
-        oled_align_center();
-        oled_draw_string(64, 15, connected ? "Connected" : "Disconnected");
-
-	oled_font_small();
-	oled_align_left();
-        oled_draw_string(5, 32, "Last command:");
-        oled_draw_string(5, 46, "Phone RSSI:");
-        oled_draw_string(5, 60, "Pump  RSSI:");
-
-	oled_align_right();
-	char buf[16];
-	format_time_ago(buf);
-	oled_draw_string(122, 32, buf);
-	if (connected) {
-		sprintf(buf, "%d", phone_rssi);
-		oled_draw_string(122, 46, buf);
-		sprintf(buf, "%d", pump_rssi);
-		oled_draw_string(122, 60, buf);
-	} else {
-		oled_draw_string(122, 46, "--");
-		oled_draw_string(122, 60, "--");
-	}
-
-        oled_update();
-	usleep(DISPLAY_TIMEOUT*SECONDS);
-	oled_off();
-}
-
-static void display_loop(void *unused) {
-	for (;;) {
-		display_command_t cmd;
-		if (!xQueueReceive(display_queue, &cmd, pdMS_TO_TICKS(100))) {
-			continue;
-		}
-		ESP_LOGD(TAG, "display_loop: op %d arg %d", cmd.op, cmd.arg);
-		update(cmd);
+	else
+	{
+		sprintf(buf, "%5ds", seconds);
 	}
 }
 
-static void button_interrupt(void *unused) {
-	display_command_t cmd = { .op = SHOW_STATUS };
-	xQueueSendFromISR(display_queue, &cmd, 0);
+typedef struct
+{
+	int8_t rssi;
+	uint32_t uptime;
+} connection_display_data_t;
+
+typedef struct
+{
+	connection_display_data_t connections[2];
+	uint16_t battery_voltage;
+	uint32_t uptime;
+} display_data_t;
+
+static inline uint32_t timestamp_to_period(uint32_t timestamp)
+{
+	return (esp_timer_get_time() / SECONDS) - timestamp;
 }
 
-void display_update(display_op_t op, int arg) {
-	display_command_t cmd = { .op = op, .arg = arg };
-	if (!xQueueSend(display_queue, &cmd, 0)) {
-		ESP_LOGE(TAG, "display_update: queue full");
-	}
-}
-
-void display_init(void) {
+static void draw_initial()
+{
 	oled_init();
-	display_queue = xQueueCreate(QUEUE_LENGTH, sizeof(display_command_t));
-	xTaskCreate(display_loop, "display", 2048, 0, 10, 0);
-	display_update(SHOW_STATUS, 0);
+	oled_font_medium();
+	oled_align_right();
+
+	// draw phone glyph_t
+	// 0-15
+	oled_draw_xbm(CENTER_OFFSET(15, PHONE.width), Y_LINE_CENTER(0, PHONE.height), PHONE.width, PHONE.height, PHONE.bits);
+	// draw pump glyph_t
+	// 16-31
+	oled_draw_xbm(CENTER_OFFSET(15, PUMP.width), Y_LINE_CENTER(1, PUMP.height), PUMP.width, PUMP.height, PUMP.bits);
+	// draw battery glyph_t
+	// 32-47
+	oled_draw_xbm(CENTER_OFFSET(15, BATTERY.width), Y_LINE_CENTER(2, BATTERY.height), BATTERY.width, BATTERY.height, BATTERY.bits);
+	// draw clock glyph_t
+	// 48-63
+	oled_draw_xbm(CENTER_OFFSET(15, CLOCK.width), Y_LINE_CENTER(3, CLOCK.height), CLOCK.width, CLOCK.height, CLOCK.bits);
+
+	// draw labels
+	oled_draw_string(OLED_WIDTH - 1 - CHAR_WIDTH * 7, Y_LINE_CENTER(0, 13), "dBm");
+	oled_draw_string(OLED_WIDTH - 1 - CHAR_WIDTH * 7, Y_LINE_CENTER(1, 13), "dBm");
+	oled_draw_string(OLED_WIDTH - 1, Y_LINE_CENTER(2, 13), "mV");
+	oled_draw_string(OLED_WIDTH - 1 - 7 * CHAR_WIDTH, Y_LINE_CENTER(2, 13), "%");
+}
+static void draw_data()
+{
+	char buf[7];
+
+	static display_data_t last_display_data = {
+		.battery_voltage = UINT16_MAX,
+		.uptime = UINT32_MAX,
+		.connections = {
+			{.uptime = UINT32_MAX, .rssi = INT8_MAX},
+			{.uptime = UINT32_MAX, .rssi = INT8_MAX},
+		},
+	};
+	uint8_t should_update = 0;
+
+	// draw phone + pump RSSI
+	for (int i = 0; i < 2; i++)
+	{
+		connection_display_data_t *last_connection_data = &last_display_data.connections[i];
+		connection_stats_t *connection_data = &get_connection_stats()[i];
+
+		const int8_t old_rssi = last_connection_data->rssi;
+		const int8_t new_rssi = connection_data->rssi;
+
+		if (old_rssi != new_rssi)
+		{
+			sprintf(buf, new_rssi ? "%4d" : " ---", new_rssi);
+			oled_draw_string(OLED_WIDTH - 1 - 10 * CHAR_WIDTH, Y_LINE_CENTER(i, 13), buf);
+			last_connection_data->rssi = new_rssi;
+			should_update = 1;
+		}
+
+		const uint32_t old_period = last_display_data.uptime;
+		const uint32_t new_period = timestamp_to_period(connection_data->timestamp);
+
+		if (new_period != old_period)
+		{
+			format_time_period(buf, new_period);
+			oled_draw_string(OLED_WIDTH - 1, Y_LINE_CENTER(i, 13), buf);
+			last_connection_data->uptime = new_period;
+			should_update = 1;
+		}
+	}
+
+	// draw battery stats
+	const uint16_t old_battery_voltage = last_display_data.battery_voltage;
+	const uint16_t new_battery_voltage = get_battery_voltage();
+	if (new_battery_voltage != old_battery_voltage)
+	{
+		sprintf(buf, "%4d", battery_percent(new_battery_voltage));
+		oled_draw_string(OLED_WIDTH - 1 - 8 * CHAR_WIDTH, Y_LINE_CENTER(2, 13), buf);
+
+		sprintf(buf, "%4d", new_battery_voltage);
+		oled_draw_string(OLED_WIDTH - 1 - 2 * CHAR_WIDTH, Y_LINE_CENTER(2, 13), buf);
+		last_display_data.battery_voltage = new_battery_voltage;
+		should_update = 1;
+	}
+
+	// draw uptime
+	const uint32_t old_uptime = last_display_data.uptime;
+	const uint32_t new_uptime = timestamp_to_period(0);
+
+	if (new_uptime != old_uptime)
+	{
+		format_time_period(buf, new_uptime);
+		oled_draw_string(OLED_WIDTH - 1, Y_LINE_CENTER(3, 13), buf);
+		last_display_data.uptime = new_uptime;
+		should_update = 1;
+	}
+
+	if(should_update)
+		oled_update();
+}
+
+static void display_loop(void *unused)
+{
+	draw_initial();
+
+	TickType_t timeout = 0;
+
+	// Notify the task itself to draw data immediately.
+	xTaskNotify(task_handle, pdTRUE, eSetValueWithOverwrite);
+
+	for (;;)
+	{
+		uint32_t notification_value;
+		BaseType_t notified = xTaskNotifyWait(0, 0, &notification_value, timeout);
+		if (notified == pdTRUE && notification_value == pdFALSE)
+		{
+			timeout = portMAX_DELAY;
+			oled_off();
+		}
+		else
+		{
+			timeout = pdMS_TO_TICKS(100);
+			draw_data();
+			oled_on();
+		}
+	}
+}
+
+static inline void disable_display(TimerHandle_t xTimer)
+{
+	xTaskNotify(task_handle, pdFALSE, eSetValueWithOverwrite);
+}
+
+static void button_interrupt(void *unused)
+{
+	BaseType_t higher_priority_task_woken = pdFALSE;
+
+	if (!gpio_get_level(BUTTON))
+	{
+		xTaskNotifyFromISR(task_handle, pdTRUE, eSetValueWithOverwrite, &higher_priority_task_woken);
+		xTimerStopFromISR(shutdown_timer, &higher_priority_task_woken);
+	}
+	else
+		xTimerResetFromISR(shutdown_timer, &higher_priority_task_woken);
+
+	portYIELD_FROM_ISR(higher_priority_task_woken);
+}
+
+void display_init(void)
+{
+	xTaskCreate(display_loop, "display", 4096, 0, 10, &task_handle);
+	shutdown_timer = xTimerCreate("display_off", pdMS_TO_TICKS(DISPLAY_TIMEOUT * 1000), pdFALSE, 0, disable_display);
 
 	// Enable interrupt on button press.
 	gpio_set_direction(BUTTON, GPIO_MODE_INPUT);
-	gpio_set_intr_type(BUTTON, GPIO_INTR_NEGEDGE);
+	gpio_set_intr_type(BUTTON, GPIO_INTR_ANYEDGE);
 	gpio_install_isr_service(0);
 	gpio_isr_handler_add(BUTTON, button_interrupt, 0);
 	gpio_intr_enable(BUTTON);
+
+	xTimerStart(shutdown_timer, 0);
 }
