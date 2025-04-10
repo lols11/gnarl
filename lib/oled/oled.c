@@ -60,9 +60,9 @@ static const uint8_t *font[NUM_STYLES][NUM_SIZES] = {
 	},
 	// monospace
 	{
-		u8g2_font_courR08_tr,
-		u8g2_font_courR12_tr,
-		u8g2_font_courR24_tr,
+		u8g2_font_t0_11_mr,
+		u8g2_font_t0_16_mr,
+		u8g2_font_t0_22_mr,
 	},
 };
 
@@ -133,7 +133,7 @@ void oled_draw_string(int x, int y, const char *s) {
 		}
 		x -= w;
 	}
-	u8g2_DrawStr(&u8g2, x, y, s);
+	u8g2_DrawStr(&u8g2, x, y + oled_font_ascent(), s);
 }
 
 void oled_draw_box(int x, int y, int w, int h) {

@@ -33,6 +33,7 @@ sed "s/xyzzy/$project/" < ../mk/Makefile > Makefile
 sed "s/xyzzy/$project/" < ../mk/CMakeLists.project > CMakeLists.txt
 cp ../mk/partitions.csv .
 cp ../mk/platformio.ini .
+cp ../mk/sdkconfig.heltec_wifi_lora_32_V2 .
 cp ../mk/CMakeLists.main src/CMakeLists.txt
 cp ../mk/component.mk src/component.mk
 

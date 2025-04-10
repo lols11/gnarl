@@ -19,6 +19,8 @@
 #define LORA_DIO1	GPIO_NUM_35
 #define LORA_DIO2	GPIO_NUM_34
 
+#define BATTERY_ADC GPIO_NUM_13
+
 // Comment out the following line for a TTGO ESP LoRa v1 module w/o OLED
 #define OLED_ENABLE
 

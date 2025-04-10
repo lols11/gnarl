@@ -100,6 +100,7 @@ static void draw_initial()
 {
 	oled_init();
 	oled_font_medium();
+	oled_font_monospace();
 	oled_align_right();
 
 	// draw phone glyph_t
