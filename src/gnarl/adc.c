@@ -14,7 +14,8 @@ const static char *TAG = "ADC";
 #define AVG_SAMPLES (10)
 #define AVG_PERIOD (4) // seconds
 #define SCALE_VOLTAGE(raw_mv) (raw_mv * (100 + 220) / 100)
-
+static uint16_t full_bat = 4120;
+static uint16_t empty_bat = 3080;
 static int battery_voltage;
 
 uint16_t get_battery_voltage(void)
@@ -22,10 +23,35 @@ uint16_t get_battery_voltage(void)
     return battery_voltage;
 }
 
+#ifdef LIPO_BATTERY
 uint8_t battery_percent(uint16_t battery_voltage)
 {
-    uint16_t full_bat = 4200;
-    uint16_t empty_bat = 3000;
+    int percent=0;
+    if (battery_voltage <= empty_bat)
+        return 0; 
+    if (battery_voltage >= full_bat)
+        return 100; 
+
+
+    double x = (double)(battery_voltage - empty_bat) / (double)(full_bat - empty_bat);
+
+
+    const double a = 13.0; 
+    const double b = 0.70;
+
+
+    double y = 1.0 / (1.0 + exp(-a * (x - b)));
+
+    percent = (int) lround(y * 100.0);
+
+    ESP_LOGI(TAG, "(Conv) Battery voltage: %d mV, percentage: %d%%", battery_voltage, percent);
+
+    return percent;
+}
+
+#elif //Fallback to default
+uint8_t battery_percent(uint16_t battery_voltage)
+{
 
     if (battery_voltage > full_bat)
         battery_voltage = full_bat;
@@ -38,6 +64,7 @@ uint8_t battery_percent(uint16_t battery_voltage)
 
     return percent;
 }
+#endif
 
 static void adc_task(void *arg)
 {
