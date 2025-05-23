@@ -2,37 +2,39 @@
 
 ![TTGO LoRa OLED v1](images/ttgo.png)
 
-## Warning
 
-This repository contains **very preliminary** code, intended for
-collaboration among developers. It **is not ready** for end users
-and may be subject to rebasing without notice.
+> [!CAUTION]
+> This repository contains **very preliminary** code, intended for
+> collaboration among developers. It **is not ready** for end users
+> and may be subject to rebasing without notice.
+
+> [!WARNING]
+> The code isn't up to date with what I'm using right now.
+> It may need some changes.
 
 ## Hardware
 
-This project has been developed and tested on
+~This project has been developed and tested on
 a TTGO version 1 ESP32 868/915 MHz LoRa OLED module,
 which contains an ESP32 SoC, an RFM95 LoRa radio,
-a 128x64 pixel SSD1306 OLED display, and a LiPo battery charger. The
-version without OLED display is supported as well (see below in "Software
+a 128x64 pixel SSD1306 OLED display, and a LiPo battery charger.~
+
+This fork is focused on the LilyGO T3 S3 v1.2 (ESP32-S3) 
+with an SX1276 radio and a 128x64 SSD1306 OLED display.
+
+The version without OLED display is supported as well (see below in "Software
 Setup").
 
 The module has two push-buttons.
 One is hard-wired to reset the board;
 the other is available as an input or interrupt source.
 
-They are available from [AliExpress,](https://www.aliexpress.com/item/2pcs-TTGO-LORA32-Lora-868Mhz-ESP32-LoRa-OLED-0-96-Inch-Blue-Display-Bluetooth-WIFI-ESP/32839249834.html)
-[Banggood,](https://www.banggood.com/2Pcs-Wemos-TTGO-LORA32-868915Mhz-ESP32-LoRa-OLED-0_96-Inch-Blue-Display-p-1239769.html)
-and numerous others.
+They are available from [Lilygo]([https://www.aliexpress.com/item/2pcs-TTGO-LORA32-Lora-868Mhz-ESP32-LoRa-OLED-0-96-Inch-Blue-Display-Bluetooth-WIFI-ESP/32839249834.html](https://lilygo.cc/products/t3s3-v1-0))
 
-### *TTGO version 2 module is not supported*
-
-The current code does not work on the TTGO version 2 module due to
-different pin assignments.
 
 ## Radios
 
-The ESP32 SoC contains both WiFi and Bluetooth radios.
+The ESP32S3 SoC contains both WiFi and Bluetooth radios.
 
 The radio chip ([HopeRF RFM95](https://www.hoperf.com/modules/lora/RFM95.html) /
 [Semtech SX1276](https://www.semtech.com/products/wireless-rf/lora-transceivers/sx1276))
@@ -77,14 +79,14 @@ git submodule status --recursive
 
 ### Set up a local ESP32 development environment
 
-1. [Follow these instructions to install the ESP-IDF development environment.](https://docs.espressif.com/projects/esp-idf/en/v5.0/esp32/get-started/index.html#installation-step-by-step)
+1. [Follow these instructions to install the ESP-IDF development environment.](https://docs.espressif.com/projects/esp-idf/en/v5.4.1/esp32s3/get-started/index.html)
 
 1. Build and flash one of the example applications to make sure you have a working setup.
 
 ### Alternative: Use the ESP-IDF Docker image
 
-1. Run `docker pull espressif/idf:v5.0` to download the ESP-IDF image.
-[See this page for additional information.](https://docs.espressif.com/projects/esp-idf/en/v5.0/esp32/api-guides/tools/idf-docker-image.html)
+1. Run `docker pull espressif/idf:v5.4.1` to download the ESP-IDF image.
+[See this page for additional information.](https://docs.espressif.com/projects/esp-idf/en/v5.4.1/esp32s3/api-guides/tools/idf-docker-image.html)
 
 ### Disable OLED support if necessary
 
