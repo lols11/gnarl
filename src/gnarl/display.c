@@ -14,7 +14,8 @@
 #include "module.h"
 #include "oled.h"
 
-#define DISPLAY_TIMEOUT 5 // seconds
+#define DISPLAY_TIMEOUT 10 // seconds
+#define MENU_DISPLAY_TIMEOUT 20
 #define ROW_HEIGHT (OLED_HEIGHT / 4)
 #define CHAR_WIDTH 8
 #define CENTER_OFFSET(x, object_width) ((x - object_width) / 2)
