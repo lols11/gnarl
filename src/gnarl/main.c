@@ -8,6 +8,7 @@
 #include "gnarl.h"
 #include "rfm95.h"
 #include "spi.h"
+#include "esp_wifi.h"
 
 /**
  * To enable power saving:
@@ -16,6 +17,8 @@
  * menuconfig -> Component config -> Hardware Settings -> RTC clock source -> External 32MHz
  * menuconfig -> Component config -> Bluetooth -> Controller Options -> Modem Sleep -> Enable
  * menuconfig -> Component config -> Bluetooth -> Controller Options -> Modem Sleep -> Low Power Clock -> 32kHz
+ * //FREERTOS_UNICORE
+ * //(CONFIG_FREERTOS_IDLE_TIME_BEFORE_SLEEP 2
  */
 
 void app_main(void)
@@ -29,7 +32,9 @@ void app_main(void)
 	ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 
 	ESP_LOGI(TAG, "%s", SUBG_RFSPY_VERSION);
-
+	esp_wifi_stop();
+	esp_wifi_deinit();
+	
 	rfm95_init();
 	uint8_t v = read_version();
 	ESP_LOGD(TAG, "radio version %d.%d", version_major(v), version_minor(v));
