@@ -12,10 +12,15 @@
 #include <nvs_flash.h>
 #include <services/gap/ble_svc_gap.h>
 #include <services/gatt/ble_svc_gatt.h>
-
+#include "bleprph.h"
+#include "esp_pm.h"
+#include "host/ble_hs.h"
+#include "esp_nimble_hci.h"
+#include "nimble/ble.h"
 #include "adc.h"
 #include "commands.h"
-
+#include "console/console.h"
+// #include <host/ble_esp_gap.h>
 #define MAX_DATA 150
 
 #define CUSTOM_NAME_SIZE 30
@@ -145,7 +150,7 @@ static void server_init(void)
 
 	ble_uuid_to_str(&service_uuid.u, u);
 	ESP_LOGD(TAG, "service UUID %s", u);
-
+	ESP_LOGW(TAG, "AAAAAAAAAAAAAAAAAAAservice UUID %s", u);
 	esp_timer_handle_t t;
 	esp_timer_create_args_t timer_args = {
 		.callback = timer_tick_callback,
@@ -192,10 +197,15 @@ static void advertise(void)
 	memset(&adv, 0, sizeof(adv));
 	adv.conn_mode = BLE_GAP_CONN_MODE_UND;
 	adv.disc_mode = BLE_GAP_DISC_MODE_GEN;
-
+	// adv.itvl_min = 800;
+	// adv.itvl_max = 1000;
 	err = ble_gap_adv_start(addr_type, 0, BLE_HS_FOREVER, &adv, handle_gap_event, 0);
 	assert(!err);
-
+	//ble_hs_send_vs_event_mask(ESP_BLE_VENDOR_SLEEP_WAKEUP_EVT_MASK);
+	//assert(err == 0);
+	//static struct ble_gap_event_listener vs_event_listener;
+	//err = ble_gap_event_listener_register(&vs_event_listener, handle_gap_event, NULL);
+	//assert(err == 0);
 	ESP_LOGD(TAG, "advertising started");
 }
 
@@ -215,11 +225,19 @@ static int handle_gap_event(struct ble_gap_event *e, void *arg)
 		ble_gap_conn_rssi(e->connect.conn_handle, &rssi);
 		set_ble_rssi(rssi);
 
+		// TODO: BLE PARAMS
+		const struct ble_gap_upd_params slow = {
+			.itvl_min = 60,
+			.itvl_max = 80,
+			.latency = 2,
+			.supervision_timeout = 200};
+		// ble_gap_update_params(connection_handle, &slow);
 		connection_handle = e->connect.conn_handle;
 		ESP_LOGI(TAG, "connected");
 		ESP_LOGD(TAG, "connection handle 0x%04X", connection_handle);
 		ESP_LOGD(TAG, "response count notify handle 0x%04X", response_count_notify_handle);
 		ESP_LOGD(TAG, "timer tick notify handle 0x%04X", timer_tick_notify_handle);
+
 		break;
 	case BLE_GAP_EVENT_DISCONNECT:
 		connected = false;
@@ -246,6 +264,16 @@ static int handle_gap_event(struct ble_gap_event *e, void *arg)
 		}
 		ESP_LOGD(TAG, "notify %d for unknown handle %04X", e->subscribe.cur_notify, e->subscribe.attr_handle);
 		break;
+	case BLE_GAP_EVENT_VS_HCI:
+	{
+		const struct ble_hci_ev_vs *ev = e->vs_hci.ev;
+		if (ev->id == BLE_HCI_VS_SUBEV_LE_SLEEP_WAKE_UP)
+		{
+			ESP_LOGI(TAG, "Controller woke up from modem-sleep");
+		}
+		break;
+	}
+
 	default:
 		ESP_LOGD(TAG, "GAP event %d", e->type);
 		break;
