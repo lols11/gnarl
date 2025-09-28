@@ -8,6 +8,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
+#include "esp_sleep.h"
 
 #include "4b6b.h"
 #include "commands.h"
@@ -16,6 +17,14 @@
 
 #define MAX_PARAM_LEN (16)
 #define MAX_PACKET_LEN (107)
+
+#include "esp_pm.h"
+void dump_locks(void)
+{
+	return;
+	esp_pm_dump_locks(stderr); // lista aktywnych locków
+	esp_sleep_get_wakeup_cause();
+}
 
 typedef enum
 {
@@ -144,6 +153,7 @@ static void send(uint8_t *data, int len, int repeat_count, int delay_ms)
 		break;
 	}
 	transmit(data, len);
+
 	while (repeat_count > 0)
 	{
 		usleep(delay_ms * MILLISECONDS);
@@ -367,6 +377,8 @@ static void send_stats()
 // This is called from the ble task.
 void rfspy_command(const uint8_t *buf, int count, int rssi)
 {
+	//XXX:
+	dump_locks();
 	if (count == 0)
 	{
 		ESP_LOGE(TAG, "rfspy_command: count == 0");
